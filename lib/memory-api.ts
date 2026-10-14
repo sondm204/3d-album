@@ -15,12 +15,10 @@ function failure(error: unknown) {
 }
 
 // Reuse the browser helpers' multipart POST, JSON PUT and DELETE contracts.
-export function memoryMutationHandlers(store: MemoryStore, authorize: (request: Request) => Promise<Response | null> = async () => Response.json({ error: "Chưa bật quyền chỉnh sửa album." }, { status: 403 })) {
+export function memoryMutationHandlers(store: MemoryStore) {
   return {
     async POST(request: Request) {
       try {
-        const denied = await authorize(request);
-        if (denied) return denied;
         if (Number(request.headers.get("content-length")) > 11 * 1024 * 1024) {
           throw new MemoryValidationError("Chọn ảnh tối đa 10 MB.");
         }
@@ -30,8 +28,6 @@ export function memoryMutationHandlers(store: MemoryStore, authorize: (request: 
     },
     async PUT(request: Request, id: string) {
       try {
-        const denied = await authorize(request);
-        if (denied) return denied;
         const body: unknown = await request.json().catch(() => null);
         if (!body || typeof body !== "object" || !["title", "note", "date"].every(key => typeof (body as Record<string, unknown>)[key] === "string")) {
           throw new MemoryValidationError("Thông tin kỷ niệm không hợp lệ.");
@@ -42,10 +38,8 @@ export function memoryMutationHandlers(store: MemoryStore, authorize: (request: 
         return Response.json(await store.update(id, input), { headers });
       } catch (error) { return failure(error); }
     },
-    async DELETE(request: Request, id: string) {
+    async DELETE(_request: Request, id: string) {
       try {
-        const denied = await authorize(request);
-        if (denied) return denied;
         validateMemoryFields({ id, title: "deleted", note: "", date: "2000-01-01" });
         await store.delete(id);
         return new Response(null, { status: 204, headers });

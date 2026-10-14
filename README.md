@@ -45,7 +45,7 @@ Bảng dùng các cột `id`, `title`, `note`, `date`, `image_path`, `created_at
 
 Form sử dụng `saveMemory`, `updateMemory`, `deleteMemory` trong `lib/memories.ts`. Contract API: `POST /api/memories` nhận multipart (`id`, `title`, `note`, `date`, `image`); `PUT /api/memories/[id]` nhận JSON (`title`, `note`, `date`); `DELETE /api/memories/[id]` trả 204. Sửa hiện giữ ảnh gốc theo contract có sẵn. Xóa cần xác nhận trong form. Ảnh tải lên nhận JPG, PNG, WebP tối đa 10 MB; tiêu đề 120 ký tự và note 1200 ký tự. Note dài rút gọn trên giấy và đọc đầy đủ trong form.
 
-**Quyền ghi đang chờ lựa chọn cách xác thực của chủ album.** Các route mutation hiện trả 403 trước khi truy cập store. `memoryMutationHandlers` mặc định từ chối ghi và chỉ chạy khi callback xác thực cho phép; chưa nối provider đăng nhập hoặc mật khẩu chỉnh sửa. GET vẫn hoạt động bình thường. Kiểm thử CRUD dùng store giả lập, không thêm/sửa/xóa dữ liệu Supabase thật.
+Theo lựa chọn của chủ album, các API tạo/sửa/xóa cho phép truy cập không cần đăng nhập. Khóa service-role vẫn chỉ được dùng phía server. Kiểm thử CRUD dùng store giả lập, không thêm/sửa/xóa dữ liệu Supabase thật.
 
 Nếu WebGL không khả dụng, website hiển thị một album ảnh 2D có thể kéo lật và cuộn để thu/phóng.
 
@@ -67,4 +67,4 @@ node --experimental-strip-types --test tests/memory-api.test.mjs tests/memories.
 pnpm build
 ```
 
-34 kiểm tra tự động xác minh dữ liệu trả về, CRUD với store giả lập, từ chối quyền ghi, lỗi validation, trang thêm mới, bấm/hover ảnh, tải lỗi, dữ liệu trống, hủy request, hình học, chiều ảnh, chuyển động thả, tọa độ khi album đã xoay, giới hạn trang, chuột, hủy kéo, pinch, gập từ hai đầu album và mở lại đúng trang. Đây là kiểm tra logic và sự kiện, chưa thay thế kiểm tra trực quan WebGL trên trình duyệt.
+34 kiểm tra tự động xác minh dữ liệu trả về, CRUD không cần đăng nhập với store giả lập, lỗi validation, trang thêm mới, bấm/hover ảnh, tải lỗi, dữ liệu trống, hủy request, hình học, chiều ảnh, chuyển động thả, tọa độ khi album đã xoay, giới hạn trang, chuột, hủy kéo, pinch, gập từ hai đầu album và mở lại đúng trang. Đây là kiểm tra logic và sự kiện, chưa thay thế kiểm tra trực quan WebGL trên trình duyệt.
