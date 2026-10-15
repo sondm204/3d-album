@@ -120,17 +120,39 @@ export function createSupabaseMemoryStore() {
       }
     },
 
-    async update(id: string, input: Omit<MemoryInput, "id">): Promise<SavedMemory> {
+    async update(id: string, input: Omit<MemoryInput, "id">, imageFile?: File): Promise<SavedMemory> {
       const config = getConfig();
       validateMemoryFields({ id, ...input });
+      const existing = await findById(config, id);
+      if (!existing) throw new MemoryValidationError("Không tìm thấy kỷ niệm.");
+      let imagePath: string | undefined;
+      if (imageFile) {
+        const image = await validateImage(imageFile);
+        // New object URLs avoid stale cached images and preserve the old photo if PATCH fails.
+        imagePath = `${id}-${crypto.randomUUID()}.${image.extension}`;
+        await supabaseFetch(config, `/storage/v1/object/${config.bucket}/${imagePath}`, {
+          method: "POST",
+          headers: headers(config, { "Content-Type": image.contentType, "x-upsert": "false" }),
+          body: new Uint8Array(image.bytes).buffer,
+        });
+      }
       const params = new URLSearchParams({ id: `eq.${id}` });
-      const response = await supabaseFetch(config, `/rest/v1/${config.table}?${params}`, {
+      let row: SupabaseMemoryRow;
+      try {
+        const response = await supabaseFetch(config, `/rest/v1/${config.table}?${params}`, {
         method: "PATCH",
         headers: headers(config, { "Content-Type": "application/json", Prefer: "return=representation", Accept: "application/json" }),
-        body: JSON.stringify(input),
+        body: JSON.stringify({ ...input, ...(imagePath ? { image_path: imagePath } : {}) }),
       });
-      const row = ((await response.json()) as SupabaseMemoryRow[])[0];
+      row = ((await response.json()) as SupabaseMemoryRow[])[0];
       if (!row) throw new MemoryValidationError("Không tìm thấy kỷ niệm.");
+      } catch (error) {
+        if (imagePath) await removeStorageObject(config, imagePath).catch(() => {});
+        throw error;
+      }
+      if (imagePath && existing.image_path !== imagePath) {
+        await removeStorageObject(config, existing.image_path).catch(() => {});
+      }
       return toSavedMemory(row, config);
     },
 

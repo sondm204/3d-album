@@ -42,6 +42,22 @@ test("updates reject invalid JSON, dates, IDs and types before storage", async (
   assert.equal(calls, 1);
 });
 
+test("multipart updates pass a replacement photo and text fields to the store", async () => {
+  const form = new FormData();
+  for (const [key, value] of Object.entries(values)) form.set(key, value);
+  form.set("image", new File(["cropped"], "memory.jpg", { type: "image/jpeg" }));
+  let replacement;
+  const api = memoryMutationHandlers({ update: async (key, input, image) => {
+    assert.equal(key, id); assert.deepEqual(input, values); replacement = image; return record;
+  } });
+  const result = await api.PUT(new Request("http://localhost/api/memories", { method: "PUT", body: form }), id);
+  assert.equal(result.status, 200);
+  assert.equal(replacement.type, "image/jpeg");
+  form.set("image", "invalid");
+  const invalid = await api.PUT(new Request("http://localhost/api/memories", { method: "PUT", body: form }), id);
+  assert.equal(invalid.status, 400);
+});
+
 test("deletion validates IDs and returns 204 only when the store succeeds", async () => {
   let deleted;
   const api = memoryMutationHandlers({ delete: async key => { deleted = key; } });

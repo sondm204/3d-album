@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { loadMemories } from "../lib/memories.ts";
+import { loadMemories, updateMemory } from "../lib/memories.ts";
 
 const record = {
   id: "835b013e-a289-4e86-b905-23b39dc4b2db", title: "Một ngày đẹp", note: "Kỷ niệm thật",
   date: "2026-10-14", image: "https://storage.example/photo.jpg", createdAt: "2026-10-14T01:00:00Z",
 };
 
-test("loads the real API contract in server order and bypasses browser cache", async () => {
+test("sorts unsorted API memories by date and bypasses browser cache", async () => {
   const original = globalThis.fetch;
   const controller = new AbortController();
   try {
@@ -15,12 +15,23 @@ test("loads the real API contract in server order and bypasses browser cache", a
       assert.equal(path, "/api/memories");
       assert.equal(options.cache, "no-store");
       assert.equal(options.signal, controller.signal);
-      return Response.json([record, { ...record, id: "next", date: "2026-10-15" }]);
+      return Response.json([{ ...record, id: "next", date: "2026-10-15" }, record]);
     };
     const data = await loadMemories(controller.signal);
     assert.deepEqual(data.map(row => row.id), [record.id, "next"]);
     assert.equal(data[0].image, record.image);
     assert.equal(data[0].note, record.note);
+  } finally { globalThis.fetch = original; }
+});
+
+test("same-day memories have deterministic ordering by creation time then ID", async () => {
+  const original = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => Response.json([
+      { ...record, id: "z", createdAt: "2026-10-14T02:00:00Z" },
+      { ...record, id: "b" }, { ...record, id: "a" },
+    ]);
+    assert.deepEqual((await loadMemories()).map(row => row.id), ["a", "b", "z"]);
   } finally { globalThis.fetch = original; }
 });
 
@@ -60,5 +71,22 @@ test("unmount cancellation propagates to the pending request", async () => {
     const pending = loadMemories(controller.signal);
     controller.abort();
     await assert.rejects(pending, { name: "AbortError" });
+  } finally { globalThis.fetch = original; }
+});
+
+test("update uses JSON for text changes and multipart for replacement photos", async () => {
+  const original = globalThis.fetch;
+  const values = { title: record.title, note: record.note, date: record.date };
+  const image = new File(["cropped"], "memory.jpg", { type: "image/jpeg" });
+  try {
+    let options;
+    globalThis.fetch = async (_url, init) => { options = init; return Response.json(record); };
+    await updateMemory(record.id, values);
+    assert.equal(options.headers["Content-Type"], "application/json");
+    assert.deepEqual(JSON.parse(options.body), values);
+    await updateMemory(record.id, values, image);
+    assert.equal(options.headers, undefined);
+    assert.equal(options.body.get("image"), image);
+    assert.equal(options.body.get("note"), values.note);
   } finally { globalThis.fetch = original; }
 });

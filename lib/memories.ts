@@ -7,7 +7,9 @@ export async function loadMemories(signal?: AbortSignal): Promise<SavedMemory[]>
   if (!Array.isArray(result) || !result.every(memory =>
     memory && ["id", "title", "note", "date", "image", "createdAt"].every(field => typeof memory[field] === "string")
   )) throw new Error("Dữ liệu kỷ niệm không hợp lệ.");
-  return result as SavedMemory[];
+  return (result as SavedMemory[]).sort((a, b) =>
+    a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)
+  );
 }
 
 export async function saveMemory(file: File, values: { title: string; note: string; date: string }, id: string): Promise<SavedMemory> {
@@ -21,11 +23,15 @@ export async function saveMemory(file: File, values: { title: string; note: stri
   return result;
 }
 
-export async function updateMemory(id: string, values: { title: string; note: string; date: string }): Promise<SavedMemory> {
+export async function updateMemory(id: string, values: { title: string; note: string; date: string }, image?: File): Promise<SavedMemory> {
+  const form = image ? new FormData() : null;
+  if (form && image) {
+    form.set("image", image);
+    for (const [key, value] of Object.entries(values)) form.set(key, value);
+  }
   const response = await fetch(`/api/memories/${encodeURIComponent(id)}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(values),
+    ...(form ? { body: form } : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) }),
   });
   const result = await response.json();
   if (!response.ok) throw new Error(result.error ?? "Không thể cập nhật kỷ niệm.");

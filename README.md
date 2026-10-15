@@ -1,4 +1,4 @@
-﻿# Album kỷ niệm 3D
+# Album kỷ niệm 3D
 
 Trang hiển thị một cuốn album trên nền xanh trầm. Form chỉ xuất hiện khi bấm ảnh hoặc khung thêm kỷ niệm; không có thanh điều khiển bên ngoài album.
 
@@ -43,13 +43,19 @@ Cấu hình trong `.env.local` (không commit file này):
 
 Bảng dùng các cột `id`, `title`, `note`, `date`, `image_path`, `created_at`. `image_path` là đường dẫn tương đối trong bucket. Kỷ niệm được xếp tăng dần theo `date`, `created_at`, rồi `id`; mỗi kỷ niệm chiếm một trang. API trả mảng `{ id, title, note, date, image, createdAt }` và không cache để lần tải trang sau nhận dữ liệu mới. Ảnh Storage được tải với CORS để hiển thị trong texture WebGL.
 
-Form sử dụng `saveMemory`, `updateMemory`, `deleteMemory` trong `lib/memories.ts`. Contract API: `POST /api/memories` nhận multipart (`id`, `title`, `note`, `date`, `image`); `PUT /api/memories/[id]` nhận JSON (`title`, `note`, `date`); `DELETE /api/memories/[id]` trả 204. Sửa hiện giữ ảnh gốc theo contract có sẵn. Xóa cần xác nhận trong form. Ảnh tải lên nhận JPG, PNG, WebP tối đa 10 MB; tiêu đề 120 ký tự và note 1200 ký tự. Note dài rút gọn trên giấy và đọc đầy đủ trong form.
+Form sử dụng `saveMemory`, `updateMemory`, `deleteMemory` trong `lib/memories.ts`. Contract API: `POST /api/memories` nhận multipart (`id`, `title`, `note`, `date`, `image`); `PUT /api/memories/[id]` nhận JSON (`title`, `note`, `date`) hoặc multipart có thêm `image`; `DELETE /api/memories/[id]` trả 204. Sửa có thể giữ ảnh gốc, cắt lại ảnh hiện tại hoặc thay ảnh mới. Ảnh mới được upload với đường dẫn riêng; sau khi cập nhật bản ghi thành công mới dọn ảnh cũ. Xóa cần xác nhận trong form. Ảnh tải lên nhận JPG, PNG, WebP tối đa 10 MB; tiêu đề 120 ký tự và note 1200 ký tự. Note dài rút gọn trên giấy và đọc đầy đủ trong form.
 
 Theo lựa chọn của chủ album, các API tạo/sửa/xóa cho phép truy cập không cần đăng nhập. Khóa service-role vẫn chỉ được dùng phía server. Kiểm thử CRUD dùng store giả lập, không thêm/sửa/xóa dữ liệu Supabase thật.
 
 Nếu WebGL không khả dụng, website hiển thị một album ảnh 2D có thể kéo lật và cuộn để thu/phóng.
 
 ## Mã nguồn
+
+Giao diện form dùng shadcn/ui (Radix, preset Nova). Các component dùng chung nằm trong `components/ui`; cấu hình registry nằm ở `components.json`. `memory-form.tsx` sử dụng Dialog, AlertDialog, Input, Textarea, Label, Button và Alert; Tailwind v4 được biên dịch qua `postcss.config.mjs`. Không còn dùng CSS Module riêng cho form.
+
+Tên kỷ niệm và lời nhắn dùng Noto Sans tự lưu trữ với bộ ký tự tiếng Việt. Canvas vẽ lại khi font tải xong và chuẩn hóa Unicode NFC trước khi hiển thị. `loadMemories` tự sắp xếp tăng dần theo ngày, sau đó thời gian tạo và ID khi trùng ngày.
+
+Khi thêm ảnh, `react-easy-crop` cho kéo và phóng to trong khung tỷ lệ 628:516. Lưu kỷ niệm sẽ xuất riêng vùng cắt thành JPEG, tối đa 1256 × 1032 px, rồi tải lên Supabase. Trong form sửa có thể chọn ảnh khác hoặc bấm Cắt lại ảnh hiện tại. Giữ ảnh cũ sẽ hủy thay đổi ảnh và chỉ lưu thông tin.
 
 - `album-scene.tsx`: mô hình, vật liệu giấy, ánh sáng và vòng lặp chuyển động.
 - `album-interaction.ts`: bắt chuột/cảm ứng, chiếu tọa độ vào album, phân biệt xoay với lật trang.
@@ -63,8 +69,8 @@ Các file trên nằm trong `app/components`.
 Với Node.js 22.18 trở lên:
 
 ```bash
-node --experimental-strip-types --test tests/memory-api.test.mjs tests/memories.test.mjs tests/page-geometry.test.mjs tests/album-interaction.test.mjs
+node --experimental-strip-types --test tests/memory-api.test.mjs tests/memories.test.mjs tests/page-geometry.test.mjs tests/album-interaction.test.mjs tests/photo-crop.test.mjs tests/supabase-update.test.mjs
 pnpm build
 ```
 
-34 kiểm tra tự động xác minh dữ liệu trả về, CRUD không cần đăng nhập với store giả lập, lỗi validation, trang thêm mới, bấm/hover ảnh, tải lỗi, dữ liệu trống, hủy request, hình học, chiều ảnh, chuyển động thả, tọa độ khi album đã xoay, giới hạn trang, chuột, hủy kéo, pinch, gập từ hai đầu album và mở lại đúng trang. Đây là kiểm tra logic và sự kiện, chưa thay thế kiểm tra trực quan WebGL trên trình duyệt.
+41 kiểm tra tự động xác minh dữ liệu trả về, CRUD không cần đăng nhập với store giả lập, lỗi validation, trang thêm mới, bấm/hover ảnh, tải lỗi, dữ liệu trống, hủy request, hình học, chiều ảnh, chuyển động thả, tọa độ khi album đã xoay, giới hạn trang, chuột, hủy kéo, pinch, gập từ hai đầu album và mở lại đúng trang. Đây là kiểm tra logic và sự kiện, chưa thay thế kiểm tra trực quan WebGL trên trình duyệt.

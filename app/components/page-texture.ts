@@ -1,10 +1,11 @@
 import * as THREE from "three";
 import { displayDate, type Memory } from "./memories";
+import { PHOTO_WIDTH, PHOTO_HEIGHT } from "./photo-format";
 
 function wrap(ctx: CanvasRenderingContext2D, text: string, y: number, maxWidth: number, lineHeight: number, maxLines = 4) {
   let lineY = y;
   let count = 0;
-  for (const paragraph of text.split("\n")) {
+  for (const paragraph of text.normalize("NFC").split("\n")) {
     let line = "";
     for (const word of paragraph.split(" ")) {
       const candidate = line ? `${line} ${word}` : word;
@@ -41,6 +42,7 @@ export function makePage(memory: Memory | undefined, index: number, status = "",
   let hover = 0;
   let loaded: HTMLImageElement | undefined;
   let failed = false;
+  let disposed = false;
   const draw = () => {
     ctx.clearRect(0, 0, 900, 1170); ctx.drawImage(paper, 0, 0);
     if (!memory && !canAdd) {
@@ -63,22 +65,28 @@ export function makePage(memory: Memory | undefined, index: number, status = "",
     ctx.fillStyle = "#fffcf5"; ctx.fillRect(-340, -285, 680, 642); ctx.shadowColor = "transparent";
     const img = loaded;
     if (img) {
-      const ratio = Math.max(628 / img.width, 516 / img.height); const sw = 628 / ratio; const sh = 516 / ratio;
-      ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, -314, -258, 628, 516);
+      const ratio = Math.max(PHOTO_WIDTH / img.width, PHOTO_HEIGHT / img.height); const sw = PHOTO_WIDTH / ratio; const sh = PHOTO_HEIGHT / ratio;
+      ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, -314, -258, PHOTO_WIDTH, PHOTO_HEIGHT);
     } else { ctx.fillStyle = "#53684f"; ctx.fillRect(-314, -258, 628, 516); ctx.fillStyle = "#fff"; ctx.font = "24px Arial"; ctx.fillText(failed ? "Ảnh chưa tải được" : "Đang tải ảnh…", 0, 0); }
     if (hover > .01) {
       ctx.fillStyle = `rgba(25, 48, 34, ${hover * .88})`; ctx.fillRect(-314, 204, 628, 54);
       ctx.fillStyle = `rgba(255, 252, 240, ${hover})`; ctx.font = "22px Arial"; ctx.fillText("Bấm để xem / chỉnh sửa", 0, 239);
     }
-    ctx.fillStyle = "#303e30"; ctx.font = "italic 34px Georgia"; ctx.fillText(memory.title, 0, 313, 610);
+    ctx.fillStyle = "#303e30"; ctx.font = '600 32px "Noto Sans", Arial, sans-serif'; ctx.fillText(memory.title.normalize("NFC"), 0, 313, 610);
     ctx.fillStyle = "#d0bd9080"; ctx.rotate(-.06); ctx.fillRect(-81, -305, 162, 48);
     ctx.restore();
-    ctx.fillStyle = "#30392d"; ctx.font = "italic 30px Georgia"; wrap(ctx, memory.note, 855, 710, 40);
+    ctx.fillStyle = "#30392d"; ctx.font = '400 28px "Noto Sans", Arial, sans-serif'; wrap(ctx, memory.note, 855, 710, 42);
     ctx.fillStyle = "#414c3d"; ctx.font = "22px Arial"; ctx.fillText(displayDate(memory.date), 450, 1045);
     texture.needsUpdate = true;
   };
   texture.setHover = (amount: number) => { if (Math.abs(hover - amount) < .008) return; hover = amount; draw(); };
   draw();
+  texture.addEventListener("dispose", () => { disposed = true; });
+  // Canvas must be repainted after the web font loads.
+  void Promise.all([
+    document.fonts.load('400 28px "Noto Sans"', "Kỷ niệm tiếng Việt ấ ệ ỡ"),
+    document.fonts.load('600 32px "Noto Sans"', "Kỷ niệm tiếng Việt ấ ệ ỡ"),
+  ]).then(() => { if (!disposed) draw(); }).catch(() => {});
   if (!memory) return texture;
   const img = new Image();
   // Keep storage images origin-clean so their canvas can be uploaded to WebGL.

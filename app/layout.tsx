@@ -1,5 +1,7 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import "./globals.css";
+import "@fontsource/noto-sans/400.css";
+import "@fontsource/noto-sans/600.css";
 
 export const metadata: Metadata = {
   title: "Lưu · Những điều mình muốn giữ",
